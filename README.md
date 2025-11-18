@@ -45,35 +45,6 @@ Confidentiality Validation (heuristic):
 - Ensures ciphertext is base64 and contains no obvious plaintext markers or common words.
 - Provides simple leakage check—not a formal cryptanalysis.
 
----
-## System Workflow (High-Level)
-
-```mermaid
-flowchart LR
-	A[User Browser] -->|Upload file + keywords| B[Flask App]
-	B -->|Derive Keys (PBKDF2)| K[(Keys)]
-	B -->|Extract Text (PDF/DOCX)| P[Plain Text]
-	B -->|Encrypt (Fernet)| C[(Ciphertext)]
-	B -->|Hash keywords with index_key| T[(Trapdoor Tokens)]
-	T --> I[In-Memory Token→Doc Index]
-	C --> S[State.json Persistence]
-	I --> S
-	A -->|Search keyword| B
-	B -->|Compute Trapdoor| T2[(Trapdoor)]
-	T2 -->|Match| I
-	I -->|Doc IDs| B -->|Return results| A
-```
-
-Detailed Flow:
-1. Upload / Paste → File read (single read) → Text extraction (PDF/DOCX) → Fallback pdfminer if PyPDF2 empty.
-2. Key derivation on startup (master password env var or default).
-3. Encrypt plaintext with Fernet → store ciphertext in memory and persist to `state.json`.
-4. Generate trapdoor tokens for each keyword → update index mapping token → doc IDs.
-5. Search uses same hash construction; returns matched IDs and timing metrics.
-6. Efficiency route runs repeated searches, calculates avg/min/max, returns series for chart.
-7. Reset route wipes memory + uploads + rewrites empty state.
-
----
 ## Features
 
 - Upload: `.txt`, `.pdf`, `.docx` or manual paste.
