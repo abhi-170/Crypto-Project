@@ -67,100 +67,105 @@ Constraints and assumptions:
 ---
 ## 7. Flowdiagram of Proposed Model
 
+# Application Flow Diagrams
+
+This document contains the Mermaid diagrams describing the searchable encryption application architecture, request flow, and key interactions.
+
+## 1. High-Level Encryption & Search Flow
 ```mermaid
 flowchart LR
-  A[User Browser] -->|Upload file + keywords| B[Flask App]
-  B -->|Derive Keys (PBKDF2)| K[(Enc Key, Index Key)]
-  B -->|Extract Text (PDF/DOCX)| P[Plain Text]
-  B -->|Encrypt (Fernet)| C[(Ciphertext)]
-  B -->|SHA-256(IndexKey||kw)| T[(Trapdoor Tokens)]
-  T --> I[Token → DocIDs Index]
-  C --> S[Persist: state.json]
+  A[User Browser] --> B[Flask App]
+  B --> K[Key Derivation PBKDF2]
+  B --> P[Extract Text]
+  B --> C[Encrypt Fernet]
+  B --> T[Create Trapdoor Tokens]
+  T --> I[Token -> DocIDs Index]
+  C --> S[state.json]
   I --> S
-  A -->|Search keyword| B
-  B -->|Compute Token| T2[(Trapdoor)]
-  T2 -->|Lookup| I
-  I -->|Doc IDs| B -->|Results| A
+  A --> B
+  B --> T2[Compute Trapdoor Search]
+  T2 --> I
+  I --> R[Results]
 ```
 
-### Extended Application Flow (All Core Routes)
-
+## 2. Extended Application Flow (All Core Routes)
 ```mermaid
 flowchart TD
   subgraph Client
     U[User] --> UI[Web UI]
   end
-  subgraph Backend[Flask Application]
-    SE[(SearchableEncryption Core)]
+  subgraph Backend[Flask App]
+    SE[SearchableEncryption Core]
     ST[state.json]
   end
 
-  %% Upload Path
-  UI -->|POST /upload (file, keywords)| UP[Upload Handler]
-  UP -->|Parse & Extract| PARSERS[TXT/PDF/DOCX]
-  UP -->|Encrypt (Fernet)| ENC[Ciphertext]
-  UP -->|Generate Trapdoor Tokens| TOKENS[SHA256(index_key||kw)]
-  ENC --> SE
+  UI --> UP[Upload Handler]
+  UP --> PARSERS[Parse TXT/PDF/DOCX]
+  PARSERS --> ENC[Encrypt]
+  ENC --> TOKENS[Trapdoor Token Gen]
   TOKENS --> SE
-  SE -->|Persist snapshot| ST
-  UP -->|Redirect + Toast| UI
+  ENC --> SE
+  SE --> ST
+  UP --> UI
 
-  %% Bulk Generation
-  UI -->|POST /generate-bulk (count, keyword)| BULK[Bulk Generator]
-  BULK -->|Loop: Create Synthetic Docs| SYNTH[Documents]
+  UI --> BULK[Bulk Generate]
+  BULK --> SYNTH[Synthetic Docs]
   SYNTH --> ENC2[Encrypt Each]
   ENC2 --> SE
   BULK --> UI
 
-  %% Search Path
-  UI -->|POST /search (keyword)| SRCH[Search Handler]
-  SRCH -->|Compute Trapdoor| TD[SHA256(index_key||kw)]
+  UI --> SRCH[Search Handler]
+  SRCH --> TD[Compute Trapdoor]
   TD --> SE
-  SE -->|Matching Doc IDs + Time| SRCH
-  SRCH -->|JSON Result| UI
+  SE --> SRCH
+  SRCH --> UI
 
-  %% Efficiency Test
-  UI -->|POST /efficiency-test| EFF[Efficiency Loop]
-  EFF -->|Repeated Trapdoor Searches| SE
-  SE -->|Timings| EFF
-  EFF -->|Avg/Min/Max + Series| UI
+  UI --> EFF[Efficiency Test]
+  EFF --> SE
+  SE --> EFF
+  EFF --> UI
 
-  %% Decrypt Path
-  UI -->|GET /decrypt/<id>| DEC[Decrypt Handler]
+  UI --> DEC[Decrypt Handler]
   DEC --> SE
-  SE -->|Plaintext| DEC
+  SE --> DEC
   DEC --> UI
 
-  %% Reset Path
-  UI -->|POST /reset (confirm=erase)| RST[Reset Handler]
-  RST -->|Clear In-Memory| SE
-  RST -->|Rewrite Empty| ST
+  UI --> RST[Reset Handler]
+  RST --> SE
+  SE --> ST
   RST --> UI
 ```
 
-### Sequence (Upload & Search)
-
+## 3. Sequence Diagram (Upload & Search)
 ```mermaid
 sequenceDiagram
   actor User
-  participant Browser as Web UI
-  participant Flask as Flask App
-  participant Core as SSE Core
+  participant Browser
+  participant Server
+  participant Core
 
-  User->>Browser: Select file + enter keywords
-  Browser->>Flask: POST /upload (multipart form)
-  Flask->>Core: encrypt_document(content, keywords)
-  Core-->>Flask: metadata (sizes, counts)
-  Flask-->>Browser: Redirect + success toast
+  User->>Browser: choose file & keywords
+  Browser->>Server: POST /upload
+  Server->>Core: encrypt_document
+  Core-->>Server: metadata
+  Server-->>Browser: redirect + toast
 
-  User->>Browser: Enter search keyword
-  Browser->>Flask: POST /search (keyword)
-  Flask->>Core: search_encrypted(keyword)
-  Core-->>Flask: matching doc IDs + timing
-  Flask-->>Browser: JSON (results, trapdoor snippet, time)
+  User->>Browser: enter keyword
+  Browser->>Server: POST /search
+  Server->>Core: search_encrypted
+  Core-->>Server: doc IDs + time
+  Server-->>Browser: JSON results
 ```
 
+## 4. Legend / Notes
+- **Trapdoor Token:** SHA256(index_key || lowercase(keyword)) — deterministic; leaks equality of queries.
+- **State Persistence:** `state.json` stores ciphertexts (base64) + token index + metadata.
+- **Bulk Generation:** Produces synthetic documents to test scalability quickly.
+- **Reset Route:** Secure wipe of in-memory structures and persisted file (requires confirmation word `erase`).
+
 ---
+For additional architectural evolution (e.g., forward-private SSE, multi-user tenancy, ORAM layers), new nodes can be appended beneath the core encryption component.
+
 ## 8. Model Description
 
 Components:
