@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm stat-card">
+  <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+    <span class="fw-semibold"><i class="bi bi-unlock"></i> Decrypted Document: {{ doc_id }}</span>
+    <div class="d-flex gap-2">
+      <button id="copyBtn" class="btn btn-sm btn-outline-primary"><i class="bi bi-clipboard"></i> Copy</button>
+      <a class="btn btn-sm btn-outline-secondary" href="/"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+  </div>
+  <div class="card-body">
+    <pre class="code">{{ content }}</pre>
+  </div>
+  <script>
+    document.getElementById('copyBtn').addEventListener('click', async ()=>{
+      const text = document.querySelector('pre.code').innerText;
+      try { await navigator.clipboard.writeText(text); toast('Copied to clipboard','success'); } catch(e){ toast('Copy failed','danger'); }
+    });
+  </script>
+</div>
+{% endblock %}

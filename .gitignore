@@ -1,0 +1,85 @@
+###############################
+# Python / Flask Project Gitignore
+# Adjust as needed before publishing
+###############################
+
+# Bytecode / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+.Python
+
+# Installer / PyInstaller
+*.spec
+
+# Environment & secrets
+.env
+.env.*
+
+# Flask instance folder (if used)
+instance/
+
+# Logs & runtime dumps
+*.log
+*.pid
+*.sqlite3
+
+# Tooling / IDE
+.vscode/
+*.code-workspace
+.idea/
+*.iml
+
+# OS cruft
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# State & generated content (optional—keeps repo clean)
+state.json
+uploads/
+
+# Cache directories
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+__pypackages__/
+
+# Coverage / test reports
+htmlcov/
+.coverage*
+coverage.xml
+*.lcov
+
+# Jupyter (not currently used but future-proof)
+.ipynb_checkpoints/
+
+# Backup / temp files
+*.bak
+*.swp
+*.tmp
+~$*
+
+# Node (only if front-end assets added later)
+node_modules/
+*.tsbuildinfo
+
+# Ignore local encryption test artifacts (if ever added)
+encrypted_output/
+
+# Uncomment if you later add compiled extensions
+# *.so
+# *.pyd

@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm stat-card">
+      <div class="card-header bg-transparent fw-semibold"><i class="bi bi-upload"></i> Upload & Encrypt</div>
+      <div class="card-body">
+        <form method="post" action="/upload" enctype="multipart/form-data" id="upload-form">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Document ID (optional)</label>
+              <input class="form-control" name="doc_id" placeholder="doc123">
+            </div>
+            <div class="col-12">
+              <div class="dropzone" id="dropzone">
+                <div class="small text-muted mb-2">Drag & drop (.txt / .pdf / .docx) or click — after selection filename shows below</div>
+                <input type="file" class="form-control" name="file" id="fileInput" accept=".txt,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain">
+                <div class="form-text" id="fileNameHint">No file selected</div>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Or Paste Content</label>
+              <textarea class="form-control" rows="6" name="content" placeholder="Paste text..."></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Keywords (comma-separated)</label>
+              <input class="form-control" name="keywords" placeholder="security, encryption, cloud">
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-primary"><i class="bi bi-shield-lock"></i> Encrypt & Index</button>
+              <button type="reset" class="btn btn-outline-secondary"><i class="bi bi-eraser"></i> Clear</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm stat-card mb-3">
+      <div class="card-header bg-transparent fw-semibold"><i class="bi bi-search"></i> Search Encrypted</div>
+      <div class="card-body">
+        <form id="search-form">
+          <div class="input-group">
+            <input class="form-control" name="search_keyword" placeholder="Enter keyword (e.g., security)">
+            <button class="btn btn-success"><i class="bi bi-arrow-return-right"></i> Search</button>
+          </div>
+        </form>
+        <div id="search-result" class="mt-3" style="display:none;">
+          <div class="mb-1"><span class="badge bg-secondary">Trapdoor</span> <span class="token" id="trapdoor"></span></div>
+          <div class="row g-2">
+            <div class="col-4"><div class="card card-body glass p-2"><div class="small text-muted">Results</div><div class="fs-5" id="result-count">0</div></div></div>
+            <div class="col-4"><div class="card card-body glass p-2"><div class="small text-muted">Time (ms)</div><div class="fs-5" id="result-time">0.0000</div></div></div>
+            <div class="col-12">
+              <div class="small text-muted">Documents</div>
+              <div id="result-docs-wrapper" style="max-height:180px; overflow-y:auto; border:1px solid #eee; border-radius:4px; padding:4px; background:var(--bs-body-bg);">
+                <div id="result-docs" class="token"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm stat-card">
+      <div class="card-header bg-transparent fw-semibold"><i class="bi bi-speedometer2"></i> Efficiency Test</div>
+      <div class="card-body">
+        <form id="eff-form" class="row g-2 align-items-center">
+          <div class="col-sm-6">
+            <input class="form-control" name="eff_keyword" placeholder="security" value="security">
+          </div>
+          <div class="col-sm-3">
+            <input class="form-control" name="iterations" type="number" value="100" min="10" step="10">
+          </div>
+          <div class="col-sm-3">
+            <button class="btn btn-outline-secondary w-100"><i class="bi bi-play-fill"></i> Run</button>
+          </div>
+        </form>
+        <div id="eff-result" class="mt-2" style="display:none;"></div>
+        <canvas id="effChart" height="80" class="mt-2"></canvas>
+        <div class="form-text">Chart shows individual query times (ms). Axes: X = query #, Y = milliseconds. Average (dashed) line overlaid.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <div class="col-lg-6">
+    <div class="card shadow-sm stat-card">
+      <div class="card-header bg-transparent fw-semibold"><i class="bi bi-graph-up"></i> System Statistics</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6 col-md-6">
+            <div class="card glass p-3">
+              <div class="small text-muted">Total documents</div>
+              <div class="fs-4 fw-semibold">{{ stats.total_documents }}</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-6">
+            <div class="card glass p-3">
+              <div class="small text-muted">Encrypted keywords</div>
+              <div class="fs-4 fw-semibold">{{ stats.total_encrypted_keywords }}</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-6">
+            <div class="card glass p-3">
+              <div class="small text-muted">Encrypted size</div>
+              <div class="fs-5">{{ stats.total_encrypted_size }} bytes</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-6">
+            <div class="card glass p-3">
+              <div class="small text-muted">Avg keywords/doc</div>
+              <div class="fs-5">{{ '%.2f'|format(stats.average_keywords_per_document) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm stat-card">
+      <div class="card-header bg-transparent d-flex justify-content-between align-items-center flex-wrap">
+        <span class="fw-semibold"><i class="bi bi-hash"></i> Encrypted Keyword Index (sample)</span>
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          <form id="bulk-form" class="d-flex align-items-center mb-0">
+            <input type="hidden" name="count" value="500">
+            <div class="input-group input-group-sm" style="width:auto; max-width: 220px;">
+              <input class="form-control form-control-sm" name="keyword" placeholder="security" value="security" style="max-width: 160px;">
+              <button class="btn btn-primary btn-sm" title="Add many docs for scalability test"><i class="bi bi-rocket"></i> Generate 500 Docs</button>
+            </div>
+          </form>
+          <form id="reset-form" class="mb-0">
+            <input type="hidden" name="confirm" value="erase">
+            <button class="btn btn-outline-danger btn-sm text-nowrap" title="Wipe all encrypted documents" onclick="return confirm('Erase ALL documents & index?')"><i class="bi bi-trash"></i> Erase All</button>
+          </form>
+        </div>
+      </div>
+      <div class="card-body scroll-section">
+        <ul class="list-group list-group-flush">
+          {% for h, docs in sample_index %}
+            <li class="list-group-item">
+              <span class="token">{{ h }}</span> <span class="text-muted">→</span> {{ docs }}
+            </li>
+          {% else %}
+            <li class="list-group-item">No index entries yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-4 stat-card">
+  <div class="card-header bg-transparent fw-semibold"><i class="bi bi-file-text"></i> Documents</div>
+  <div class="card-body">
+    <div class="table-responsive scroll-section">
+      <table class="table table-hover table-sm align-middle">
+        <thead><tr>
+          <th>ID</th><th>Encrypted size</th><th>Original size</th><th>Keywords</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+        {% for doc_id, meta in metadata.items() %}
+          <tr>
+            <td class="fw-semibold">{{ doc_id }}</td>
+            <td><span class="badge text-bg-secondary">{{ meta.encrypted_size }}</span></td>
+            <td><span class="badge text-bg-light">{{ meta.original_size }}</span></td>
+            <td><span class="badge text-bg-info">{{ meta.keyword_count }}</span></td>
+            <td class="text-nowrap">
+              <a href="/decrypt/{{ doc_id }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-unlock"></i> Decrypt</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5">No documents yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Validation UI removed as requested -->
+
+<script>
+// Drag & drop
+const dz = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+// Prevent double-trigger when clicking the actual input (stops bubbling to dz)
+fileInput.addEventListener('click', (e) => e.stopPropagation());
+// Only trigger picker when clicking outside the native input
+dz.addEventListener('click', (e) => { if (e.target !== fileInput) fileInput.click(); });
+dz.addEventListener('dragover', (e)=>{ e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', ()=> dz.classList.remove('dragover'));
+dz.addEventListener('drop', (e)=>{ 
+  e.preventDefault(); 
+  dz.classList.remove('dragover'); 
+  if (e.dataTransfer.files.length){ 
+    fileInput.files = e.dataTransfer.files; 
+    // Normalize behavior: fire change so hints/UI update
+    fileInput.dispatchEvent(new Event('change'));
+  }
+});
+fileInput.addEventListener('change', ()=>{
+  const name = fileInput.files && fileInput.files[0] ? fileInput.files[0].name : 'No file selected';
+  const hint = document.getElementById('fileNameHint');
+  if (hint) hint.textContent = name;
+});
+
+// Search
+const sf = document.getElementById('search-form');
+sf.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(sf);
+  showSpinner();
+  const res = await fetch('/search', { method: 'POST', body: fd });
+  hideSpinner();
+  const data = await res.json();
+  const box = document.getElementById('search-result');
+  if (data.error){
+    box.style.display='none';
+    toast(data.error, 'danger');
+    return;
+  }
+  document.getElementById('trapdoor').textContent = data.trapdoor_used;
+  document.getElementById('result-count').textContent = data.result_count;
+  const docsWrap = document.getElementById('result-docs');
+  docsWrap.innerHTML = '';
+  if (Array.isArray(data.matching_documents) && data.matching_documents.length){
+    data.matching_documents.forEach(id => {
+      const span = document.createElement('span');
+      span.className = 'badge text-bg-primary me-1 mb-1';
+      span.textContent = id;
+      docsWrap.appendChild(span);
+    });
+  } else {
+    docsWrap.innerHTML = '<span class="text-muted">No matches</span>';
+  }
+  document.getElementById('result-time').textContent = (data.search_time * 1000).toFixed(4);
+  box.style.display='block';
+});
+
+// Efficiency test + chart
+let chart;
+const ef = document.getElementById('eff-form');
+ef.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(ef);
+  fd.append('include_series','1');
+  showSpinner();
+  const res = await fetch('/efficiency-test', { method: 'POST', body: fd });
+  hideSpinner();
+  const data = await res.json();
+  const box = document.getElementById('eff-result');
+  box.innerHTML = `Avg: <strong>${data.avg_ms}</strong> ms (min ${data.min_ms}, max ${data.max_ms}) over ${data.iterations} queries for "${data.keyword}"`;
+  box.style.display = 'block';
+
+  if (data.series_ms){
+    const ctx = document.getElementById('effChart');
+    if (chart) chart.destroy();
+    const avg = data.avg_ms;
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.series_ms.map((_, i) => i+1),
+        datasets: [
+          { label: 'Query time (ms)', data: data.series_ms, borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,.1)', fill: true, tension: .25, pointRadius: 1 },
+          { label: 'Average (ms)', data: data.series_ms.map(()=> avg), borderColor: '#dc3545', borderDash:[6,6], pointRadius: 0 }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: { title: { display: true, text: 'Query #'} },
+          y: { beginAtZero: true, title: { display: true, text: 'Time (ms)'} }
+        }
+      }
+    });
+  }
+});
+
+// Bulk generate
+const bf = document.getElementById('bulk-form');
+// Reset all data
+const rf = document.getElementById('reset-form');
+rf.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const fd = new FormData(rf);
+  showSpinner();
+  const res = await fetch('/reset', { method: 'POST', body: fd });
+  hideSpinner();
+  const data = await res.json();
+  if(data.error){ toast(data.error,'danger'); return; }
+  toast(`Wiped: ${data.before.documents} docs → ${data.after.documents}`,'warning');
+  setTimeout(()=> location.reload(), 600);
+});
+bf.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(bf);
+  showSpinner();
+  const res = await fetch('/generate-bulk', { method: 'POST', body: fd });
+  hideSpinner();
+  const data = await res.json();
+  toast(`Added ${data.added} docs in ${data.seconds}s (avg ${data.avg_ms_per_doc} ms/doc). Total: ${data.total_docs}`, 'success');
+  setTimeout(()=> location.reload(), 800);
+});
+
+// Validate confidentiality for a doc (modal)
+// Validation UI removed
+</script>
+{% endblock %}
